@@ -1,0 +1,19 @@
+{
+  "name": "snap-games",
+  "version": "1.0.0",
+  "description": "Snap/SEF library for creating games with more advanced features (camera, physics, etc.).",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev-client": "npx webpack --watch"
+  },
+  "devDependencies": {
+    "ts-loader": "^9.3.1",
+    "typescript": "^4.7.4",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0"
+  },
+  "dependencies": {
+    "amd-loader": "^0.0.8",
+    "sef": "file:sef"
+  }
+}
