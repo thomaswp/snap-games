@@ -1,9 +1,17 @@
-import { Events, Extension } from 'sef';
+import { Events, Extension, Blocks } from 'sef';
 
 export class SnapGames extends Extension {
+
+    addBlocks(blocks: Blocks.BlockFactory): void {
+        blocks.registerBlock(new Blocks.Block(
+            'test', 'test', [], Blocks.BlockType.Reporter,
+            'motion',
+        ).addSpriteAction(function() {
+            return this;
+        }));
+    }
+
     init() {
-        console.log('initialized!');
-        console.log('ide', this.snap.IDE);
         this.events.addListener(new Events.Block.SnappedListener(args => {
             console.log(args.id);
         }));
