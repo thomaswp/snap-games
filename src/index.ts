@@ -1,18 +1,17 @@
-// import  {BlockFactory} from '../sef/src/blocks/BlockFactory'
+import { Events, Extension } from 'sef';
 
-import { EventManager, SnapHelper } from 'sef';
+export class SnapGames extends Extension {
+    init() {
+        console.log('initialized!');
+        console.log('ide', this.snap.IDE);
+        this.events.addListener(new Events.Block.SnappedListener(args => {
+            console.log(args.id);
+        }));
+    }
+}
 
-console.log("!!!!");
-
-export const test = 12;
-
-const em = new EventManager();
-em.test();
-
-const sh = new SnapHelper();
-console.log('IDE', sh.snap().IDE());
-
-
+const games = new SnapGames();
+games.register();
 
 
 
