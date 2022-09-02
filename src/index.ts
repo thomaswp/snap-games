@@ -1,11 +1,12 @@
 import { Blocks, Events, Extension, Snap } from 'sef';
 import { Color } from 'sef/src/snap/Snap';
 import { Levels } from './level';
-import { Camera } from './Camera';
+import { addCameraBlocks, Camera } from './Camera';
 
 export class SnapGames extends Extension {
     addBlocks(blocks: Blocks.BlockFactory): void {
         Levels.addBlocks(blocks);
+        addCameraBlocks(blocks);
     }
 
     init() {
@@ -15,8 +16,6 @@ export class SnapGames extends Extension {
         this.events.addListener(new Events.Block.SnappedListener(args => {
             console.log(args.id);
         }));
-
-        new Camera();
     }
 }
 
