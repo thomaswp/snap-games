@@ -1,17 +1,16 @@
-import { Events, Extension, Blocks } from 'sef';
+import { Blocks, Events, Extension, Snap } from 'sef';
+import { Color } from 'sef/src/snap/Snap';
+import { Levels } from './level';
 
 export class SnapGames extends Extension {
-
     addBlocks(blocks: Blocks.BlockFactory): void {
-        blocks.registerBlock(new Blocks.Block(
-            'test', 'test', [], Blocks.BlockType.Reporter,
-            'motion',
-        ).addSpriteAction(function() {
-            return this;
-        }));
+        Levels.addBlocks(blocks);
     }
 
     init() {
+        this.blocks.addCategory('game', new Color(120, 80, 20));
+        console.log('initialized!');
+        console.log('ide', Snap.IDE);
         this.events.addListener(new Events.Block.SnappedListener(args => {
             console.log(args.id);
         }));
