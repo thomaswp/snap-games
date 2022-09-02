@@ -4,9 +4,10 @@
   "description": "Snap/SEF library for creating games with more advanced features (camera, physics, etc.).",
   "main": "src/index.ts",
   "scripts": {
-    "dev-client": "npx webpack --watch"
+    "dev": "concurrently --kill-others \"npx webpack --watch\" \"cd sef && npx webpack --watch\""
   },
   "devDependencies": {
+    "concurrently": "^7.3.0",
     "ts-loader": "^9.3.1",
     "typescript": "^4.7.4",
     "webpack": "^5.74.0",
