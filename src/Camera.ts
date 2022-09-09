@@ -29,9 +29,9 @@ export class Camera {
     target: CameraTarget;
     transform: Transform;
     snap: number;
-    isPanning = false;
-    panMouseStart: Point;
-    panCameraStart: Point;
+    private isPanning = false;
+    private panMouseStart: Point;
+    private panCameraStart: Point;
 
     constructor() {
         this.target = {
@@ -60,15 +60,9 @@ export class Camera {
     startUserControl() {
         this.target = {
             sprite: null,
-            transform: this.transform,
+            transform: this.transform.copy(),
         }
-    }
-
-    previewPosition() : Point {
-        if (this.isUserControlling()) {
-            this.updateUserCamera()
-        }
-        return this.target.transform.position;
+        this.target.transform.rotation = 0;
     }
 
     updateUserCamera() {
@@ -85,25 +79,37 @@ export class Camera {
         }
         let mousePos = hand.position();
         let offset = this.panMouseStart.subtract(mousePos)
-            .multiplyBy(1 / this.transform.scale / stage.scale);
+            .multiplyBy(this.transform.scale / stage.scale);
         offset.y = -offset.y;
-        this.transform.position = this.panCameraStart.add(offset);;
+        this.target.transform.position = this.panCameraStart.add(offset);
     }
 
-    previewScale() {
-        if (!this.target || this.target instanceof StageMorph) {
-            return 1
-        // TODO: Why are these different?
-        } else if (this.isUserControlling()) {
-            return this.target.transform.scale;
+    handleMouseDown(pos: any): boolean {
+        if (!this.isUserControlling()) return false;
+        this.isPanning = true;
+        this.panMouseStart = pos.copy();
+        this.panCameraStart = this.target.transform.position;
+    }
+
+    handleMouseScroll(y: number): boolean {
+        if (!this.isUserControlling()) return false;
+        if (this.isPanning) return false;
+        this.target.transform.scale *= Math.pow(1.1, -y);
+        return true;
+    }
+
+    update() : boolean {
+        if (this.isUserControlling()) {
+            this.updateUserCamera()
         }
-        return 100 / this.target.transform.scale;
-    }
+        if (this.transform.equals(this.target.transform)) {
+            return false;
+        }
 
-    update() {
+        // TODO: Should be based on elapsed time, not frames
         let rate = 0.05 + 0.95 * Math.pow((this.snap) / 100, 4);
-        this.transform.position = this.transform.position.lerp(this.previewPosition(), rate, 1);
-        this.transform.scale = lerp(this.transform.scale, this.previewScale(), rate, 0.01);
+        this.transform.lerpTo(this.target.transform, rate);
+        return true;
     }
 
     setTarget(sprite: SpriteMorph | StageMorph) {
@@ -127,10 +133,72 @@ Point.prototype.lerp = function(b: Point, p: number, thresh: number) {
 }
 
 
-class Transform {
-    position = new Point();
-    scale = 1;
-    rotation = 0;
+export class Transform {
+    position: Point;
+    rotation: number;
+    scale: number;
+
+    constructor(x = 0, y = 0, rotation = 0, scale = 1) {
+        this.position = new Point(x, y);
+        this.rotation = rotation;
+        this.scale = scale;
+    }
+
+    private static normalizeRotation(rotation) {
+        while (rotation < 0) rotation += 360;
+        return rotation % 360;
+    }
+
+    lerpTo(transform: Transform, rate: number) {
+        this.position = this.position.lerp(transform.position, rate, 1);
+        this.scale = lerp(this.scale, transform.scale, rate, 0.01);
+
+        // Make sure the target rotation is normalized and <= 180 degrees different
+        this.rotation = Transform.normalizeRotation(this.rotation);
+        let targetRotation = Transform.normalizeRotation(transform.rotation);
+        if (this.rotation - targetRotation > 180) targetRotation += 360;
+        if (this.rotation - targetRotation < -180) targetRotation -= 360;
+        this.rotation = lerp(this.rotation, targetRotation, rate, 0.1);
+    }
+
+    inverseApplyToPoint(point: Point) {
+        let p = point.subtract(this.position) as Point;
+        p = p.rotateBy(-this.rotation / 180 * Math.PI);
+        p = p.multiplyBy(1 / this.scale);
+        return p;
+    }
+
+    inverseApply(transform: Transform) {
+        let position = this.inverseApplyToPoint(transform.position);
+        return new Transform(
+            position.x, position.y,
+            transform.rotation - this.rotation,
+            transform.scale / this.scale,
+        )
+    }
+
+    translateBy(offset: Point) {
+        this.position = this.position.add(offset);
+    }
+
+    scaleBy(scale: number) {
+        this.scale *= scale;
+        this.position = this.position.multiplyBy(scale);
+    }
+
+    equals(transform: Transform) {
+        return this.position == transform.position &&
+            this.scale == transform.scale &&
+            this.position == transform.position;
+    }
+
+    copy() {
+        let transform = new Transform();
+        transform.position = this.position.copy();
+        transform.scale = this.scale;
+        transform.rotation = this.rotation;
+        return transform;
+    }
 
     set(sprite: SpriteMorph) {
         // TODO: Inverse transform
@@ -153,52 +221,39 @@ class Transform {
         pos.y = -pos.y;
         return pos.add(this.position);
     }
-
-    getGlobalRotation() {
-        let camera = Camera.getCamera();
-        let rotation = this.rotation;
-        // if (camera) rotation += rotation;
-        return rotation;
-    }
-
-    getGlobalScale() {
-        let camera = Camera.getCamera();
-        let scale = this.scale;
-        if (camera) scale *= camera.transform.scale;
-        return scale;
-    }
-
-    getGlobalPosition(sprite: SpriteMorph) {
-        let stage = sprite.parentThatIsA(StageMorph);
-        if (!stage) return this.position.copy();
-        let camera = Camera.getCamera();
-        let position = this.position;
-        if (camera) {
-            position = position.subtract(camera.transform.position);
-            position = position.multiplyBy(camera.transform.scale);
-        }
-        let newX = stage.center().x + position.x * stage.scale;
-        let newY = stage.center().y - position.y * stage.scale;
-        if (sprite.costume) {
-            return new Point(newX, newY).subtract(sprite.rotationOffset);
-        } else {
-            return new Point(newX, newY).subtract(sprite.extent().divideBy(2));
-        }
-    }
 }
 
 SpriteMorph.prototype.updateGlobalTransform = function(justMe) {
-    // let stage = this.getStage();
-    // if (!stage) return;
     if (this.isUpdatingGlobalTransform) return;
     this.isUpdatingGlobalTransform = true;
-    let heading = this.transform.getGlobalRotation();
+
+    let globalTransform = this.transform as Transform;
+
+    let camera = Camera.getCamera();
+    if (camera) globalTransform = camera.transform.inverseApply(globalTransform);
+
+    let stage = this.parentThatIsA(StageMorph);
+    if (stage) {
+        globalTransform.position.y = -globalTransform.position.y;
+        globalTransform.scaleBy(stage.scale);
+        globalTransform.translateBy(stage.center());
+    }
+
+    if (this.costume) {
+        // TODO: Probably need to consider rotation
+        globalTransform.translateBy(this.rotationOffset.multiplyBy(-1));
+    } else {
+        globalTransform.translateBy(this.extent().divideBy(-2));
+    }
+
+    let heading = globalTransform.rotation;
     if (heading != this.heading) this.setGlobalHeading(heading, true);
-    let scale = this.transform.getGlobalScale();
+    let scale = globalTransform.scale
     if (scale != this.scale) this.setGlobalScale(scale * 100, true);
-    let position = this.transform.getGlobalPosition(this);
+    let position = globalTransform.position;
     if (!position.eq(this.position)) this.setPosition(position, justMe, true);
     this.positionTalkBubble();
+
     this.isUpdatingGlobalTransform = false;
     // TODO: Handle pen
 }
@@ -326,10 +381,7 @@ SpriteMorph.prototype.getScale = function () {
 StageMorph.prototype.updateSpriteForCamera = function(force: boolean) {
     let camera = Camera.getCamera();
     if (!camera) return;
-    let scale = camera.transform.scale, center = camera.transform.position,
-        newScale = camera.previewScale(), newCenter = camera.previewPosition();
-    let forceDirty = force || scale != newScale || !newCenter.eq(center);
-    camera.update();
+    let forceDirty = force || camera.update();
     this.children.forEach(child => {
         if (child instanceof SpriteMorph) {
             if (forceDirty) child.dirtyTransform = true;
@@ -344,21 +396,13 @@ OverrideRegistry.after(StageMorph, 'init', function(globals) {
 
 OverrideRegistry.after(StageMorph, 'mouseScroll', function(y) {
     let camera = Camera.getCamera();
-    if (!camera || !camera.isUserControlling()) return;
-    if (camera.isPanning) return;
-    camera.transform.scale *= Math.pow(1.1, y);
+    if (camera) camera.handleMouseScroll(y);
 });
 
 OverrideRegistry.extend(StageMorph, 'mouseDownLeft', function(base, pos) {
     let camera = Camera.getCamera();
-    if (!camera || !camera.isUserControlling()) {
-        base.call(this, pos);
-        return;
-    }
-    let user = camera.target;
-    camera.isPanning = true;
-    camera.panMouseStart = pos.copy();
-    camera.panCameraStart = camera.transform.position;
+    if (camera && camera.handleMouseDown(pos)) return;
+    base.call(this, pos);
 }, false);
 
 OverrideRegistry.after(StageMorph, 'stepFrame', function() {

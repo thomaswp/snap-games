@@ -22,5 +22,9 @@ export class SnapGames extends Extension {
 const games = new SnapGames();
 games.register();
 
+export {
+    Camera,
+}
+
 
 
