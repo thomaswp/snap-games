@@ -6,22 +6,6 @@ interface CameraTarget {
     transform: Transform;
 }
 
-// class StageTarget implements CameraTarget {
-
-//     stage: StageMorph;
-//     isUser: boolean;
-
-//     constructor(stage: StageMorph) {
-//         this.stage = stage;
-//         this.isUser = false;
-//     }
-
-//     get scale() { return this.stage.scale; }
-
-//     center = () => this.stage.center();
-
-// }
-
 const ZERO = new Point(0, 0); // TODO: Why doesn't ZERO exist?
 
 export class Camera {
@@ -102,13 +86,21 @@ export class Camera {
         if (this.isUserControlling()) {
             this.updateUserCamera()
         }
-        if (this.transform.equals(this.target.transform)) {
+
+        let targetTransform = this.target.transform;
+        if (this.target.sprite != null) {
+            // Since Sprites' default facing angle is 90, a camera-holding
+            // Sprite at 90 shouldn't rotate the camera at all
+            targetTransform = targetTransform.copy();
+            targetTransform.rotation -= 90;
+        }
+        if (this.transform.equals(targetTransform)) {
             return false;
         }
 
         // TODO: Should be based on elapsed time, not frames
         let rate = 0.05 + 0.95 * Math.pow((this.snap) / 100, 4);
-        this.transform.lerpTo(this.target.transform, rate);
+        this.transform.lerpTo(targetTransform, rate);
         return true;
     }
 
@@ -132,11 +124,20 @@ Point.prototype.lerp = function(b: Point, p: number, thresh: number) {
     );
 }
 
-
+/**
+ * Represents a transform, including position, rotation and scale.
+ * Transforms are local, usually relative to the stage, and may not
+ * reflect the actual global position of a Morph on the screen.
+ */
 export class Transform {
     position: Point;
     rotation: number;
     scale: number;
+
+    private static normalizeRotation(rotation) {
+        while (rotation < 0) rotation += 360;
+        return rotation % 360;
+    }
 
     constructor(x = 0, y = 0, rotation = 0, scale = 1) {
         this.position = new Point(x, y);
@@ -144,9 +145,14 @@ export class Transform {
         this.scale = scale;
     }
 
-    private static normalizeRotation(rotation) {
-        while (rotation < 0) rotation += 360;
-        return rotation % 360;
+    set(transform: Transform) {
+        this.position = transform.position.copy();
+        this.rotation = transform.rotation;
+        this.scale = transform.scale;
+    }
+
+    flipY() {
+        this.position.y = -this.position.y;
     }
 
     lerpTo(transform: Transform, rate: number) {
@@ -168,13 +174,30 @@ export class Transform {
         return p;
     }
 
-    inverseApply(transform: Transform) {
+    applyToPoint(point: Point) {
+        let p = point.multiplyBy(this.scale);
+        p = p.rotateBy(this.rotation / 180 * Math.PI);
+        p = p.add(this.position);
+        return p;
+    }
+
+    inverseApply(transform: Transform): Transform {
         let position = this.inverseApplyToPoint(transform.position);
         return new Transform(
             position.x, position.y,
             transform.rotation - this.rotation,
             transform.scale / this.scale,
         )
+    }
+
+    apply(transform: Transform): Transform {
+        let position = this.applyToPoint(transform.position);
+        return new Transform(
+            position.x, position.y,
+            transform.rotation + this.rotation,
+            transform.scale * this.scale,
+        );
+
     }
 
     translateBy(offset: Point) {
@@ -200,17 +223,6 @@ export class Transform {
         return transform;
     }
 
-    set(sprite: SpriteMorph) {
-        // TODO: Inverse transform
-        let stage = sprite.parentThatIsA(StageMorph);
-        this.position = sprite.rotationCenter();
-        if (stage) this.position = this.position.subtract(stage.center());
-        this.position.y = -this.position.y;
-        this.scale = sprite.scale;
-        this.rotation = sprite.heading;
-        return this;
-    }
-
     forwardPosition(steps: number) : Point{
         let angle = this.rotation;
         if (steps < 0) {
@@ -223,6 +235,11 @@ export class Transform {
     }
 }
 
+/**
+ * Updates this Sprite's global transform (position, rotation, scale) 
+ * to match its local stage position. Call this when the transform
+ * has been updated and you want to update the Morph to match.
+ */
 SpriteMorph.prototype.updateGlobalTransform = function(justMe) {
     if (this.isUpdatingGlobalTransform) return;
     this.isUpdatingGlobalTransform = true;
@@ -231,10 +248,11 @@ SpriteMorph.prototype.updateGlobalTransform = function(justMe) {
 
     let camera = Camera.getCamera();
     if (camera) globalTransform = camera.transform.inverseApply(globalTransform);
+    
+    globalTransform.flipY();
 
     let stage = this.parentThatIsA(StageMorph);
     if (stage) {
-        globalTransform.position.y = -globalTransform.position.y;
         globalTransform.scaleBy(stage.scale);
         globalTransform.translateBy(stage.center());
     }
@@ -258,15 +276,38 @@ SpriteMorph.prototype.updateGlobalTransform = function(justMe) {
     // TODO: Handle pen
 }
 
+/**
+ * Updates this Sprite's stage transform to match its global position
+ * in the world. Call this when the Morph has been moved or scaled
+ * and you want to update its transform to match.
+ */
 SpriteMorph.prototype.updateStageTransform = function() {
     // Ignore any calls during a global transform update
     if (!this.transform || this.isUpdatingGlobalTransform) return;
-    this.transform.set(this);
+
+    let transform = new Transform();
+    transform.position = this.rotationCenter();
+    transform.rotation = this.heading;
+    transform.scale = this.scale;
+
+    let stage = this.parentThatIsA(StageMorph);
+    if (stage) {
+        transform.translateBy(stage.center().multiplyBy(-1));
+        transform.scaleBy(1 / stage.scale);
+    }
+
+    transform.flipY();
+
+    let camera = Camera.getCamera();
+    if (camera) transform = camera.transform.apply(transform);
+    this.dirtyTransform = false;
+    
+    this.transform.set(transform);
 }
 
 OverrideRegistry.after(SpriteMorph, 'init', function() {
-    this.transform = new Transform().set(this);
-    this.dirtyTransform = false;
+    this.transform = new Transform();
+    this.updateStageTransform();
 });
 
 OverrideRegistry.after(SpriteMorph, 'setPosition', function() {
@@ -278,8 +319,9 @@ OverrideRegistry.after(SpriteMorph, 'setCenter', function() {
 });
 
 OverrideRegistry.after(StageMorph, 'reactToDropOf', function(morph) {
-    if (morph instanceof SpriteMorph)
-    morph.updateStageTransform();
+    if (morph instanceof SpriteMorph) {
+        morph.updateStageTransform();
+    }
 });
 
 OverrideRegistry.after(StageMorph, 'add', function(morph) {
@@ -364,19 +406,6 @@ SpriteMorph.prototype.getScale = function () {
     }
     return this.transform.scale * 100;
 };
-
-// TODO: Needed?
-// StageMorph.prototype.cameraScale = function() {
-//     let camera = Camera.getCamera();
-//     if (!camera) return this.scale;
-//     return this.scale * camera.scale;
-// }
-
-// StageMorph.prototype.cameraCenter = function() {
-//     let camera = Camera.getCamera();
-//     if (!camera) return this.center();
-//     return camera.center;
-// }
 
 StageMorph.prototype.updateSpriteForCamera = function(force: boolean) {
     let camera = Camera.getCamera();
