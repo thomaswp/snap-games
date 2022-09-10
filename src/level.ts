@@ -76,7 +76,7 @@ export class Levels {
 
     static addBlocks(blockFactory: Blocks.BlockFactory) {
         blockFactory.registerBlock(new Block(
-            'saveLevel', 'save level', [], BlockType.Reporter, 'game'
+            'saveLevel', 'save level', [], BlockType.Reporter, 'Game'
         ).addSpriteAction(function() {
             const attrs = Levels.getAttributes();
             let list = new List();
@@ -97,7 +97,7 @@ export class Levels {
         
         
         blockFactory.registerBlock(new Block(
-            'loadLevel', 'load level %l', [], BlockType.Command, 'game', false
+            'loadLevel', 'load level %l', [], BlockType.Command, 'Game', false
         ).addSpriteAction(function(list: List) {
             if (!list) return;
             // TODO: this should be in Process not SpriteMorph

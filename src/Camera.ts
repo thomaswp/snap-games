@@ -445,31 +445,31 @@ const BlockType = Blocks.BlockType;
 export function addCameraBlocks(blockFactory: Blocks.BlockFactory) {
 
     blockFactory.registerBlock(new Block(
-        'resetCamera', 'reset camera', [], BlockType.Command, 'game', false
+        'resetCamera', 'reset camera', [], BlockType.Command, 'Game', false
     ).addSpriteAction(function() {
         Camera.getCamera().setTarget(null);
     }));
 
     blockFactory.registerBlock(new Block(
-        'holdCamera', 'hold camera', [], BlockType.Command, 'game', false
+        'holdCamera', 'hold camera', [], BlockType.Command, 'Game', false
     ).addSpriteAction(function() {
         Camera.getCamera().setTarget(this);
     }));
 
     blockFactory.registerBlock(new Block(
-        'userControlsCamera', 'let user control camera', [], BlockType.Command, 'game', false
+        'userControlsCamera', 'let user control camera', [], BlockType.Command, 'Game', false
     ).addSpriteAction(function() {
         Camera.getCamera().startUserControl();
     }));
 
     blockFactory.registerBlock(new Block(
-        'isHoldingCamera', 'is holding camera', [], BlockType.Predicate, 'game', false
+        'isHoldingCamera', 'is holding camera', [], BlockType.Predicate, 'Game', false
     ).addSpriteAction(function() {
         return Camera.isHoldingCamera(this);
     }));
 
     blockFactory.registerBlock(new Block(
-        'setCameraSnap', 'set camera snap to %n', [100], BlockType.Command, 'game', false
+        'setCameraSnap', 'set camera snap to %n', [100], BlockType.Command, 'Game', false
     ).addSpriteAction(function(snap) {
         let camera = Camera.getCamera();
         if (!camera) return;
@@ -477,7 +477,7 @@ export function addCameraBlocks(blockFactory: Blocks.BlockFactory) {
     }));
 
     blockFactory.registerBlock(new Block(
-        'getCameraSnap', 'camera snap', [], BlockType.Reporter, 'game', false
+        'getCameraSnap', 'camera snap', [], BlockType.Reporter, 'Game', false
     ).addSpriteAction(function() {
         let camera = Camera.getCamera();
         if (!camera) return 1;
