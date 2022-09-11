@@ -4,13 +4,11 @@ import { Levels } from './Level';
 import { addCameraBlocks, Camera } from './Camera';
 
 export class SnapGames extends Extension {
-    addBlocks(blocks: Blocks.BlockFactory): void {
-        Levels.addBlocks(blocks);
-        addCameraBlocks(blocks);
-    }
-
+    
     init() {
         this.blocks.addCategory('Game', new Color(120, 80, 20));
+        Levels.addBlocks(this.blocks);
+        addCameraBlocks(this.blocks);
     }
 }
 

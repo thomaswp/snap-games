@@ -6,7 +6,7 @@ module.exports = {
   devtool: "inline-source-map",
   entry: "./src/index.ts",
   output: {
-    path: path.resolve(__dirname, './sef/snap/src/sef-libraries/'),
+    path: path.resolve(__dirname, 'build/'),
     filename: "games.js", // <--- Will be compiled to this single file
     library: "SnapGames",
   },
