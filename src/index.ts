@@ -11,9 +11,6 @@ export class SnapGames extends Extension {
 
     init() {
         this.blocks.addCategory('Game', new Color(120, 80, 20));
-        this.events.addListener(new Events.Block.SnappedListener(args => {
-            console.log(args.id);
-        }));
     }
 }
 

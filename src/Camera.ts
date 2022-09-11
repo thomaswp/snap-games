@@ -1,9 +1,10 @@
 import { OverrideRegistry, Blocks, Snap } from "sef";
-import { HandMorph, IDE_Morph, Point, SpriteMorph, StageMorph } from "sef/src/snap/Snap";
+import { HandMorph, Point, SpriteMorph, StageMorph } from "sef/src/snap/Snap";
 
 interface CameraTarget {
     sprite: SpriteMorph | StageMorph;
     transform: Transform;
+    isUserControlled: boolean;
 }
 
 const ZERO = new Point(0, 0); // TODO: Why doesn't ZERO exist?
@@ -13,15 +14,16 @@ export class Camera {
     target: CameraTarget;
     transform: Transform;
     snap: number;
+    lockPosition = false;
+    lockRotation = true;
+    lockScale = true;
+
     private isPanning = false;
     private panMouseStart: Point;
     private panCameraStart: Point;
 
     constructor() {
-        this.target = {
-            sprite: Snap.stage,
-            transform: new Transform(),
-        };
+        this.setTarget(null);
         this.transform = new Transform();
         this.snap = 100;
     }
@@ -38,13 +40,14 @@ export class Camera {
     }
 
     isUserControlling() : boolean {
-        return this.target && !this.target.sprite;
+        return this.target.isUserControlled;
     }
 
     startUserControl() {
         this.target = {
             sprite: null,
             transform: this.transform.copy(),
+            isUserControlled: true,
         }
         this.target.transform.rotation = 0;
     }
@@ -94,6 +97,9 @@ export class Camera {
             targetTransform = targetTransform.copy();
             targetTransform.rotation -= 90;
         }
+        if (this.lockPosition) targetTransform.position = this.transform.position;
+        if (this.lockRotation) targetTransform.rotation = this.transform.rotation;
+        if (this.lockScale) targetTransform.scale = this.transform.scale;
         if (this.transform.equals(targetTransform)) {
             return false;
         }
@@ -108,6 +114,7 @@ export class Camera {
         this.target = {
             sprite: sprite,
             transform: sprite?.transform || new Transform(),
+            isUserControlled: false,
         };
     }
 }
@@ -240,7 +247,9 @@ export class Transform {
  * to match its local stage position. Call this when the transform
  * has been updated and you want to update the Morph to match.
  */
-SpriteMorph.prototype.updateGlobalTransform = function(justMe) {
+SpriteMorph.prototype.updateGlobalTransform = function(
+    justMe: boolean, draw = false
+) {
     if (this.isUpdatingGlobalTransform) return;
     this.isUpdatingGlobalTransform = true;
 
@@ -269,11 +278,19 @@ SpriteMorph.prototype.updateGlobalTransform = function(justMe) {
     let scale = globalTransform.scale
     if (scale != this.scale) this.setGlobalScale(scale * 100, true);
     let position = globalTransform.position;
-    if (!position.eq(this.position)) this.setPosition(position, justMe, true);
+    if (!position.eq(this.position)) {
+        if (draw) {
+            this.setPosition(position, justMe, true);
+        } else {
+            let oldDown = this.isDown;
+            this.isDown = false;
+            this.setPosition(position, justMe, true);
+            this.isDown = oldDown;
+        }
+    }
     this.positionTalkBubble();
 
     this.isUpdatingGlobalTransform = false;
-    // TODO: Handle pen
 }
 
 /**
@@ -338,7 +355,7 @@ OverrideRegistry.extend(SpriteMorph, 'gotoXY', function(base, x, y, justMe, noSh
     this.transform.position = new Point(x, y);
     // Update transform directly so we can draw each movement separately
     this.dirtyTransform = true;
-    this.updateGlobalTransform(justMe);
+    this.updateGlobalTransform(justMe, true);
 });
 
 OverrideRegistry.extend(SpriteMorph, 'xPosition', function(base) {
@@ -483,6 +500,38 @@ export function addCameraBlocks(blockFactory: Blocks.BlockFactory) {
         if (!camera) return 1;
         return camera.snap;
     }));
+
+    const transform = '%transform'
+    blockFactory.addLabeledInput(transform, {
+        'position': 'position',
+        'heading': 'heading',
+        'zoom': 'zoom',
+    }, Blocks.InputTag.Static, Blocks.InputTag.ReadOnly);
+
+    blockFactory.registerBlock(new Block(
+        'setLockCamera', `set lock camera ${transform} to %b`, 
+        ['position', true], BlockType.Command, 'Game', false
+    ).addSpriteAction(function(type, lock) {
+        let camera = Camera.getCamera();
+        if (!camera) return;
+        type = type[0];
+        if (type === 'position') camera.lockPosition = lock;
+        if (type === 'heading') camera.lockRotation = lock;
+        if (type === 'zoom') camera.lockScale = lock;
+    }));
+
+    blockFactory.registerBlock(new Block(
+        'getLockCamera', `is camera ${transform} locked`, 
+        ['position'], BlockType.Predicate, 'Game', false
+    ).addSpriteAction(function(type) {
+        let camera = Camera.getCamera();
+        if (!camera) return;
+        type = type[0];
+        if (type === 'position') return camera.lockPosition;
+        if (type === 'heading') return camera.lockRotation;
+        if (type === 'zoom') return camera.lockScale;
+    }));
+
 
     // blockFactory.registerBlock(new Block(
     //     'getIgnoresCamera', 'ignores camera', [], 'predicate', 'game', true
