@@ -28,6 +28,24 @@ export class Camera {
         this.snap = 100;
     }
 
+    static init() {
+        this.createCamera();
+        addOverrides();
+
+        Snap.stage.children.forEach(child => {
+            if (child instanceof SpriteMorph) {
+                child.initTransform();
+            }
+        });
+    }
+
+    static createCamera() {
+        const threads = Snap.stage.threads;
+        if (!threads.camera) {
+            threads.camera = new Camera();
+        }
+    }
+
     static getCamera() : Camera {
         if (!Snap.IDE) return null;
         return Snap.stage.threads.camera;
@@ -97,9 +115,11 @@ export class Camera {
             targetTransform = targetTransform.copy();
             targetTransform.rotation -= 90;
         }
-        if (this.lockPosition) targetTransform.position = this.transform.position;
-        if (this.lockRotation) targetTransform.rotation = this.transform.rotation;
-        if (this.lockScale) targetTransform.scale = this.transform.scale;
+        if (!this.isUserControlling()) {
+            if (this.lockPosition) targetTransform.position = this.transform.position;
+            if (this.lockRotation) targetTransform.rotation = this.transform.rotation;
+            if (this.lockScale) targetTransform.scale = this.transform.scale;
+        }
         if (this.transform.equals(targetTransform)) {
             return false;
         }
@@ -243,7 +263,7 @@ export class Transform {
 }
 
 /**
- * Updates this Sprite's global transform (position, rotation, scale) 
+ * Updates this Sprite's global transform (position, rotation, scale)
  * to match its local stage position. Call this when the transform
  * has been updated and you want to update the Morph to match.
  */
@@ -257,7 +277,7 @@ SpriteMorph.prototype.updateGlobalTransform = function(
 
     let camera = Camera.getCamera();
     if (camera) globalTransform = camera.transform.inverseApply(globalTransform);
-    
+
     globalTransform.flipY();
 
     let stage = this.parentThatIsA(StageMorph);
@@ -318,142 +338,149 @@ SpriteMorph.prototype.updateStageTransform = function() {
     let camera = Camera.getCamera();
     if (camera) transform = camera.transform.apply(transform);
     this.dirtyTransform = false;
-    
+
     this.transform.set(transform);
 }
 
-OverrideRegistry.after(SpriteMorph, 'init', function() {
-    this.transform = new Transform();
-    this.updateStageTransform();
-});
+function addOverrides() {
 
-OverrideRegistry.after(SpriteMorph, 'setPosition', function() {
-    this.updateStageTransform();
-});
-
-OverrideRegistry.after(SpriteMorph, 'setCenter', function() {
-    this.updateStageTransform();
-});
-
-OverrideRegistry.after(StageMorph, 'reactToDropOf', function(morph) {
-    if (morph instanceof SpriteMorph) {
-        morph.updateStageTransform();
+    SpriteMorph.prototype.initTransform = function() {
+        this.transform = new Transform();
+        this.updateStageTransform();
     }
-});
 
-OverrideRegistry.after(StageMorph, 'add', function(morph) {
-    if (morph instanceof SpriteMorph)
-    morph.updateStageTransform();
-});
+    OverrideRegistry.after(SpriteMorph, 'init', function() {
+        this.initTransform();
+    });
 
-OverrideRegistry.extend(SpriteMorph, 'gotoXY', function(base, x, y, justMe, noShadow) {
-    if (!this.transform) return base.call(this, x, y, justMe, noShadow);
-    if (!noShadow) {
-        this.shadowAttribute('x position');
-        this.shadowAttribute('y position');
-    }
-    this.transform.position = new Point(x, y);
-    // Update transform directly so we can draw each movement separately
-    this.dirtyTransform = true;
-    this.updateGlobalTransform(justMe, true);
-});
+    OverrideRegistry.after(SpriteMorph, 'setPosition', function() {
+        this.updateStageTransform();
+    });
 
-OverrideRegistry.extend(SpriteMorph, 'xPosition', function(base) {
-    if (this.inheritsAttribute('x position')) {
-        return this.exemplar.xPosition();
-    }
-    return this.transform.position.x;
-});
+    OverrideRegistry.after(SpriteMorph, 'setCenter', function() {
+        this.updateStageTransform();
+    });
 
-OverrideRegistry.extend(SpriteMorph, 'yPosition', function(base) {
-    if (this.inheritsAttribute('y position')) {
-        return this.exemplar.yPosition();
-    }
-    return this.transform.position.y;
-});
-
-OverrideRegistry.extend(SpriteMorph, 'forward', function(base, steps) {
-    if (steps === 0 && this.isDown) {
-        return base.call(this, steps);
-    }
-    let dest = this.transform.forwardPosition(steps);
-    this.gotoXY(dest.x, dest.y);
-});
-
-SpriteMorph.prototype.setGlobalHeading = SpriteMorph.prototype.setHeading;
-
-SpriteMorph.prototype.setHeading = function (degrees, noShadow) {
-    this.transform.rotation = ((+degrees % 360) + 360) % 360;
-    // propagate to children that inherit my direction
-    if (!noShadow) {
-        this.shadowAttribute('direction');
-    }
-    this.dirtyTransform = true;
-};
-
-SpriteMorph.prototype.turn = function (degrees) {
-    this.setHeading(this.transform.rotation + (+degrees || 0));
-};
-
-SpriteMorph.prototype.turnLeft = function (degrees) {
-    this.setHeading(this.transform.rotation - (+degrees || 0));
-};
-
-SpriteMorph.prototype.direction = function () {
-    if (this.inheritsAttribute('direction')) {
-        return this.exemplar.direction();
-    }
-    return this.transform.rotation;
-};
-
-SpriteMorph.prototype.setGlobalScale = SpriteMorph.prototype.setScale;
-
-SpriteMorph.prototype.setScale = function (scale, noShadow) {
-    this.transform.scale = Math.max(0, scale / 100);
-    if (!noShadow) {
-        this.shadowAttribute('size');
-    }
-    this.dirtyTransform = true;
-};
-
-SpriteMorph.prototype.getScale = function () {
-    // answer my scale in percent
-    if (this.inheritsAttribute('size')) {
-        return this.exemplar.getScale();
-    }
-    return this.transform.scale * 100;
-};
-
-StageMorph.prototype.updateSpriteForCamera = function(force: boolean) {
-    let camera = Camera.getCamera();
-    if (!camera) return;
-    let forceDirty = force || camera.update();
-    this.children.forEach(child => {
-        if (child instanceof SpriteMorph) {
-            if (forceDirty) child.dirtyTransform = true;
-            child.updateGlobalTransform();
+    OverrideRegistry.after(StageMorph, 'reactToDropOf', function(morph) {
+        if (morph instanceof SpriteMorph) {
+            morph.updateStageTransform();
         }
     });
+
+    OverrideRegistry.after(StageMorph, 'add', function(morph) {
+        if (morph instanceof SpriteMorph)
+        morph.updateStageTransform();
+    });
+
+    OverrideRegistry.extend(SpriteMorph, 'gotoXY', function(base, x, y, justMe, noShadow) {
+        if (!this.transform) return base.call(this, x, y, justMe, noShadow);
+        if (!noShadow) {
+            this.shadowAttribute('x position');
+            this.shadowAttribute('y position');
+        }
+        this.transform.position = new Point(x, y);
+        // Update transform directly so we can draw each movement separately
+        this.dirtyTransform = true;
+        this.updateGlobalTransform(justMe, true);
+    });
+
+    OverrideRegistry.extend(SpriteMorph, 'xPosition', function(base) {
+        if (this.inheritsAttribute('x position')) {
+            return this.exemplar.xPosition();
+        }
+        return this.transform.position.x;
+    });
+
+    OverrideRegistry.extend(SpriteMorph, 'yPosition', function(base) {
+        if (this.inheritsAttribute('y position')) {
+            return this.exemplar.yPosition();
+        }
+        return this.transform.position.y;
+    });
+
+    OverrideRegistry.extend(SpriteMorph, 'forward', function(base, steps) {
+        if (steps === 0 && this.isDown) {
+            return base.call(this, steps);
+        }
+        let dest = this.transform.forwardPosition(steps);
+        this.gotoXY(dest.x, dest.y);
+    });
+
+    SpriteMorph.prototype.setGlobalHeading = SpriteMorph.prototype.setHeading;
+
+    SpriteMorph.prototype.setHeading = function (degrees, noShadow) {
+        this.transform.rotation = ((+degrees % 360) + 360) % 360;
+        // propagate to children that inherit my direction
+        if (!noShadow) {
+            this.shadowAttribute('direction');
+        }
+        this.dirtyTransform = true;
+    };
+
+    SpriteMorph.prototype.turn = function (degrees) {
+        this.setHeading(this.transform.rotation + (+degrees || 0));
+    };
+
+    SpriteMorph.prototype.turnLeft = function (degrees) {
+        this.setHeading(this.transform.rotation - (+degrees || 0));
+    };
+
+    SpriteMorph.prototype.direction = function () {
+        if (this.inheritsAttribute('direction')) {
+            return this.exemplar.direction();
+        }
+        return this.transform.rotation;
+    };
+
+    SpriteMorph.prototype.setGlobalScale = SpriteMorph.prototype.setScale;
+
+    SpriteMorph.prototype.setScale = function (scale, noShadow) {
+        this.transform.scale = Math.max(0, scale / 100);
+        if (!noShadow) {
+            this.shadowAttribute('size');
+        }
+        this.dirtyTransform = true;
+    };
+
+    SpriteMorph.prototype.getScale = function () {
+        // answer my scale in percent
+        if (this.inheritsAttribute('size')) {
+            return this.exemplar.getScale();
+        }
+        return this.transform.scale * 100;
+    };
+
+    StageMorph.prototype.updateSpriteForCamera = function(force: boolean) {
+        let camera = Camera.getCamera();
+        if (!camera) return;
+        let forceDirty = force || camera.update();
+        this.children.forEach(child => {
+            if (child instanceof SpriteMorph) {
+                if (forceDirty) child.dirtyTransform = true;
+                child.updateGlobalTransform();
+            }
+        });
+    }
+
+    OverrideRegistry.after(StageMorph, 'init', function(globals) {
+        Camera.createCamera();
+    });
+
+    OverrideRegistry.after(StageMorph, 'mouseScroll', function(y) {
+        let camera = Camera.getCamera();
+        if (camera) camera.handleMouseScroll(y);
+    });
+
+    OverrideRegistry.extend(StageMorph, 'mouseDownLeft', function(base, pos) {
+        let camera = Camera.getCamera();
+        if (camera && camera.handleMouseDown(pos)) return;
+        base.call(this, pos);
+    }, false);
+
+    OverrideRegistry.after(StageMorph, 'stepFrame', function() {
+        this.updateSpriteForCamera();
+    });
 }
-
-OverrideRegistry.after(StageMorph, 'init', function(globals) {
-    this.threads.camera = new Camera();
-});
-
-OverrideRegistry.after(StageMorph, 'mouseScroll', function(y) {
-    let camera = Camera.getCamera();
-    if (camera) camera.handleMouseScroll(y);
-});
-
-OverrideRegistry.extend(StageMorph, 'mouseDownLeft', function(base, pos) {
-    let camera = Camera.getCamera();
-    if (camera && camera.handleMouseDown(pos)) return;
-    base.call(this, pos);
-}, false);
-
-OverrideRegistry.after(StageMorph, 'stepFrame', function() {
-    this.updateSpriteForCamera();
-});
 
 
 const Block = Blocks.Block;
@@ -509,7 +536,7 @@ export function addCameraBlocks(blockFactory: Blocks.BlockFactory) {
     }, Blocks.InputTag.Static, Blocks.InputTag.ReadOnly);
 
     blockFactory.registerBlock(new Block(
-        'setLockCamera', `set lock camera ${transform} to %b`, 
+        'setLockCamera', `set lock camera ${transform} to %b`,
         ['position', true], BlockType.Command, 'Game', false
     ).addSpriteAction(function(type, lock) {
         let camera = Camera.getCamera();
@@ -521,7 +548,7 @@ export function addCameraBlocks(blockFactory: Blocks.BlockFactory) {
     }));
 
     blockFactory.registerBlock(new Block(
-        'getLockCamera', `is camera ${transform} locked`, 
+        'getLockCamera', `is camera ${transform} locked`,
         ['position'], BlockType.Predicate, 'Game', false
     ).addSpriteAction(function(type) {
         let camera = Camera.getCamera();
