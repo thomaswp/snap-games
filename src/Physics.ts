@@ -1,3 +1,89 @@
+import * as Matter from 'matter-js';
+import { Snap } from 'sef';
+
+export class Physics {
+
+    engine: Matter.Engine;
+    runner: Matter.Runner;
+    render: Matter.Render;
+
+    private floor: Matter.Body;
+
+    init() {
+        this.engine = Matter.Engine.create({
+            enableSleeping: true,
+        });
+
+        // this.setGravity(1, 180);
+
+        this.setFloorActive(true);
+        
+        // create runner
+        this.runner = Matter.Runner.create();
+
+        // run the engine
+        Matter.Runner.run(this.runner, this.engine);
+
+        // Can use this to see a debug display
+        this.createRender();
+    }
+
+    createRender() {
+        let stage = Snap.IDE.stage;
+        let renderDiv = document.createElement('div');
+        renderDiv.id = "renderer";
+        renderDiv.innerHTML = "";
+        renderDiv.style.zIndex = "999";
+        renderDiv.style.position = "absolute";
+        renderDiv.style.pointerEvents = "none";
+        // TODO: Update size on stage resize
+        renderDiv.style.top = `${stage.bounds.origin.y}px`;
+        renderDiv.style.right = `0px`;
+        let width = stage.width(), height = stage.height();
+        renderDiv.style.width = `${width}px`;
+        renderDiv.style.height = `${height}px`;
+
+        document.body.appendChild(renderDiv);
+
+        // create a renderer
+        this.render = Matter.Render.create({
+            element: renderDiv,
+            engine: this.engine,
+            options: {
+                width: width,
+                height: height,
+            },
+            // TODO: Update dimensions on stage dimension change
+            bounds: Matter.Bounds.create([
+                Matter.Vector.create(-240, -180),
+                Matter.Vector.create(240, 180)
+            ]),
+        });
+        this.render.canvas.width = width;
+        this.render.canvas.height = height;
+
+        // run the renderer
+        Matter.Render.run(this.render);
+        this.render.canvas.style.background = 'rgb(21 21 21 / 20%)';
+    }
+
+    isFloorActive() {
+        return !!this.floor;
+    }
+
+    setFloorActive(active: boolean) {
+        if (active == this.isFloorActive()) return;
+        if (!active) {
+            Matter.Composite.remove(this.engine.world, this.floor);
+            this.floor = null;
+        } else {
+            this.floor = Matter.Bodies.rectangle(0, 190, 20000, 20,
+                { isStatic: true });
+            Matter.Composite.add(this.engine.world, this.floor);
+        }
+    }
+}
+
 // Matter.Common.setDecomp(decomp);
 
 // class Physics {
@@ -33,37 +119,7 @@
 //         // setTimeout(() => this.createRender(), 1);
 //     }
 
-//     createRender() {
-//         let stage = ide.stage;
-//         let renderDiv = document.getElementById('renderer');
-//         renderDiv.innerHTML = "";
-//         renderDiv.style.top = `${stage.bounds.origin.y}px`;
-//         renderDiv.style.right = `0px`;
-//         let width = stage.width(), height = stage.height();
-//         renderDiv.style.width = `${width}px`
-//         renderDiv.style.height = `${height}px`
 
-//         // create a renderer
-//         this.render = Matter.Render.create({
-//             element: renderDiv,
-//             engine: this.engine,
-//             width: width,
-//             height: height,
-//             bounds: Matter.Bounds.create([
-//                 Matter.Vector.create(-240, -180),
-//                 Matter.Vector.create(240, 180)
-//             ]),
-//         });
-//         this.render.canvas.width = width;
-//         this.render.canvas.height = height;
-//         this.render.options.width = width;
-//         this.render.options.height = height;
-
-
-//         // run the renderer
-//         Matter.Render.run(this.render);
-//         this.render.canvas.style.background = 'rgb(21 21 21 / 20%)';
-//     }
 
 //     snapDirToVec(direction, magnitude) {
 //         let vec = Matter.Vector.create;
@@ -264,10 +320,6 @@
 
 //     getBodyOffset(body, sprite) {
 //         return body.centerOffset.rotateBy((90 - sprite.heading) / 180 * Math.PI)
-//     }
-
-//     isFloorActive() {
-//         return !!this.floor;
 //     }
 
 //     setFloorActive(active) {
