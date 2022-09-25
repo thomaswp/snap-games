@@ -147,8 +147,6 @@ export class Physics {
         sprite.physicsData = {};
         var body = this.createBodyForCostume(sprite);
         Matter.Composite.add(this.engine.world, body);
-        // We update the scale here, since body already
-        // sprite.lastUpdateScale = sprite.scale;
         this.updateSpriteBody(sprite, body);
         this.spriteMap.set(sprite, body);
     }
@@ -272,7 +270,7 @@ export class Physics {
         Matter.Body.setAngle(body, angle);
 
         // Update scale
-        let scaleUp = sprite.scale / transform.scale;
+        let scaleUp = transform.scale / lastTransform.scale;
         Matter.Body.scale(body, scaleUp, scaleUp);
         // Scale center offset too
         data.centerOffset = data.centerOffset.scaleBy(scaleUp);

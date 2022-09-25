@@ -1,6 +1,12 @@
 import { OverrideRegistry, Blocks, Snap } from "sef";
 import { HandMorph, Point, SpriteMorph, StageMorph } from "sef/src/snap/Snap";
 
+/**
+ * TODO:
+ * - if on edge bounce
+ * - mouse x/y
+ */
+
 interface CameraTarget {
     sprite: SpriteMorph | StageMorph;
     transform: Transform;
@@ -265,6 +271,10 @@ export class Transform {
 SpriteMorph.prototype.updateGlobalTransform = function(
     justMe: boolean, draw = false
 ) {
+    // Ignore this if we haven't initialized yet
+    if (!this.transform) return;
+
+    // Avoid recursive calls
     if (this.isUpdatingGlobalTransform) return;
     this.isUpdatingGlobalTransform = true;
 
@@ -305,6 +315,7 @@ SpriteMorph.prototype.updateGlobalTransform = function(
     }
     this.positionTalkBubble();
 
+    this.dirtyTransform = false;
     this.isUpdatingGlobalTransform = false;
 }
 
@@ -316,6 +327,12 @@ SpriteMorph.prototype.updateGlobalTransform = function(
 SpriteMorph.prototype.updateStageTransform = function() {
     // Ignore any calls during a global transform update
     if (!this.transform || this.isUpdatingGlobalTransform) return;
+
+    if (this.dirtyTransform) {
+        // Theoretically this should be impossible, since we
+        // always update the global transform before calling this
+        console.warn('Updating stage position with dirty transform');
+    }
 
     let transform = new Transform();
     transform.position = this.rotationCenter();
@@ -348,11 +365,15 @@ function addOverrides() {
         this.initTransform();
     });
 
-    OverrideRegistry.after(SpriteMorph, 'setPosition', function() {
+    OverrideRegistry.wrap(SpriteMorph, 'setPosition', function() {
+        this.updateGlobalTransform();
+    }, function() {
         this.updateStageTransform();
     });
 
-    OverrideRegistry.after(SpriteMorph, 'setCenter', function() {
+    OverrideRegistry.wrap(SpriteMorph, 'setCenter', function() {
+        this.updateGlobalTransform();
+    }, function() {
         this.updateStageTransform();
     });
 
@@ -363,8 +384,9 @@ function addOverrides() {
     });
 
     OverrideRegistry.after(StageMorph, 'add', function(morph) {
-        if (morph instanceof SpriteMorph)
-        morph.updateStageTransform();
+        if (morph instanceof SpriteMorph) {
+            morph.updateStageTransform();
+        }
     });
 
     OverrideRegistry.extend(SpriteMorph, 'gotoXY', function(base, x, y, justMe, noShadow) {
@@ -444,6 +466,10 @@ function addOverrides() {
         }
         return this.transform.scale * 100;
     };
+
+    OverrideRegistry.after(SpriteMorph, 'clonify', function() {
+        this.transform = this.transform.copy();
+    });
 
     StageMorph.prototype.updateSpriteForCamera = function(force: boolean) {
         let camera = Camera.getCamera();
