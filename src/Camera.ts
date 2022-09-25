@@ -173,7 +173,8 @@ export class Transform {
     }
 
     set(transform: Transform) {
-        this.position = transform.position.copy();
+        this.position.x = transform.position.x;
+        this.position.y = transform.position.y;
         this.rotation = transform.rotation;
         this.scale = transform.scale;
     }
@@ -237,7 +238,7 @@ export class Transform {
     }
 
     equals(transform: Transform) {
-        return this.position == transform.position &&
+        return this.position.eq(transform.position) &&
             this.scale == transform.scale &&
             this.position == transform.position;
     }

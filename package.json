@@ -16,7 +16,9 @@
   "dependencies": {
     "@types/matter-js": "^0.18.2",
     "amd-loader": "^0.0.8",
+    "hull.js": "^1.0.2",
     "matter-js": "^0.18.0",
+    "poly-decomp": "^0.3.0",
     "sef": "file:sef"
   }
 }

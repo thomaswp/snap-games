@@ -10,8 +10,7 @@ export class SnapGames extends Extension {
 
     init() {
         Camera.init();
-        this.physics = new Physics();
-        this.physics.init();
+        this.physics = Physics.init(this.blocks);
 
         this.blocks.addCategory('Game', new Color(120, 80, 20));
         Levels.addBlocks(this.blocks);
