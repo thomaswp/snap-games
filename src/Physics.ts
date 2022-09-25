@@ -1,6 +1,6 @@
 import * as Matter from 'matter-js';
 import * as PolyDecomp from 'poly-decomp'
-import hull from 'hull.js'
+import * as hull from 'hull.js'
 import { Blocks, OverrideRegistry, Snap } from 'sef';
 import { Color, Costume, Point, SpriteMorph, StageMorph } from 'sef/src/snap/Snap';
 import { Transform } from './Camera';
@@ -22,7 +22,7 @@ function getPhysicsData(sprite: SpriteMorph): PhysicsData {
 export class Physics {
 
     engine: Matter.Engine;
-    runner: Matter.Runner;
+    // runner: Matter.Runner;
     render: Matter.Render;
 
     private static instance: Physics;
@@ -52,15 +52,17 @@ export class Physics {
             enableSleeping: true,
         });
 
-        // this.setGravity(1, 180);
+        this.setGravity(1, 180);
 
         this.setFloorActive(true);
-        
-        // create runner
-        this.runner = Matter.Runner.create();
 
-        // run the engine
-        Matter.Runner.run(this.runner, this.engine);
+        // Test body if you need it
+        // let body = Matter.Bodies.circle(-50, 0, 30);
+        // Matter.Composite.add(this.engine.world, body);
+        
+        // create runner to auto-run if you need it
+        // let runner = Matter.Runner.create();
+        // Matter.Runner.run(runner, this.engine);
 
         // Can use this to see a debug display
         this.createRender();
@@ -130,7 +132,7 @@ export class Physics {
         this.engine.gravity = {
             x: g.x,
             y: g.y,
-            scale: 1
+            scale: 0.001,
         };
         this.wakeUpAllBodies();
     }
@@ -288,7 +290,8 @@ export class Physics {
             getPhysicsData(sprite).lastVelocity = Matter.Vector.clone(body.velocity);
         });
         // Fixed stepping is safer
-        Matter.Engine.update(this.engine);
+        // TODO: Should this be based on Snap's FPS?
+        Matter.Engine.update(this.engine, 1000 / 60);
         this.spriteMap.forEach((body, sprite) => {
             if (!sprite.parentThatIsA(StageMorph)) return;
 

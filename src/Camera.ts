@@ -22,6 +22,8 @@ export class Camera {
     private panMouseStart: Point;
     private panCameraStart: Point;
 
+    static instance: Camera;
+
     constructor() {
         this.setTarget(null);
         this.transform = new Transform();
@@ -29,7 +31,7 @@ export class Camera {
     }
 
     static init() {
-        this.createCamera();
+        this.instance = new Camera();
         addOverrides();
 
         Snap.stage.children.forEach(child => {
@@ -39,16 +41,8 @@ export class Camera {
         });
     }
 
-    static createCamera() {
-        const threads = Snap.stage.threads;
-        if (!threads.camera) {
-            threads.camera = new Camera();
-        }
-    }
-
     static getCamera() : Camera {
-        if (!Snap.IDE) return null;
-        return Snap.stage.threads.camera;
+        return this.instance;
     }
 
     static isHoldingCamera(sprite: SpriteMorph) {
@@ -462,10 +456,6 @@ function addOverrides() {
             }
         });
     }
-
-    OverrideRegistry.after(StageMorph, 'init', function(globals) {
-        Camera.createCamera();
-    });
 
     OverrideRegistry.after(StageMorph, 'mouseScroll', function(y) {
         let camera = Camera.getCamera();

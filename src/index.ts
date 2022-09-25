@@ -23,6 +23,7 @@ games.register();
 
 export {
     Camera,
+    Physics,
 }
 
 
