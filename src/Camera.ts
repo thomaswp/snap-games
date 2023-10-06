@@ -1,5 +1,5 @@
 import { OverrideRegistry, Blocks, Snap } from "sef";
-import { HandMorph, Point, SpriteMorph, StageMorph } from "sef/src/snap/Snap";
+import { HandMorph, Point, Process, SpriteMorph, StageMorph } from "sef/src/snap/Snap";
 
 /**
  * TODO:
@@ -496,6 +496,31 @@ function addOverrides() {
 
     OverrideRegistry.after(StageMorph, 'stepFrame', function() {
         this.updateSpriteForCamera();
+    });
+
+    const getTransformedPoint = function(x, y) {
+        let camera = Camera.getCamera();
+        let point = new Point(x, y);
+        if (!camera?.transform) return point;
+        return camera.transform.applyToPoint(point);
+    }
+
+    const baseStageMouseX = StageMorph.prototype.reportMouseX;
+    const baseStageMouseY = StageMorph.prototype.reportMouseY;
+    OverrideRegistry.extend(StageMorph, 'reportMouseX', function(base) {
+        return getTransformedPoint(baseStageMouseX.call(this), baseStageMouseY.call(this)).x;
+    });
+    OverrideRegistry.extend(StageMorph, 'reportMouseY', function(base) {
+        return getTransformedPoint(baseStageMouseX.call(this), baseStageMouseY.call(this)).y;
+    });
+
+    const baseProcessMouseX = Process.prototype.reportMouseX;
+    const baseProcessMouseY = Process.prototype.reportMouseY;
+    OverrideRegistry.extend(Process, 'reportMouseX', function(base) {
+        return getTransformedPoint(baseProcessMouseX.call(this), baseProcessMouseY.call(this)).x;
+    });
+    OverrideRegistry.extend(Process, 'reportMouseY', function(base) {
+        return getTransformedPoint(baseProcessMouseX.call(this), baseProcessMouseY.call(this)).y;
     });
 }
 

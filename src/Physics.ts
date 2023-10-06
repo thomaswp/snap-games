@@ -1,7 +1,7 @@
 import * as Matter from 'matter-js';
 import * as PolyDecomp from 'poly-decomp'
 import * as hull from 'hull.js'
-import { Blocks, OverrideRegistry, Snap } from 'sef';
+import { Blocks, ExtensionManager, OverrideRegistry, Snap } from 'sef';
 import { Color, Costume, Point, SpriteMorph, StageMorph } from 'sef/src/snap/Snap';
 import { Transform } from './Camera';
 
@@ -65,7 +65,9 @@ export class Physics {
         // Matter.Runner.run(runner, this.engine);
 
         // Can use this to see a debug display
-        this.createRender();
+        if (ExtensionManager.devMode.isDevMode) {
+            this.createRender();
+        }
     }
 
     createRender() {
@@ -104,7 +106,7 @@ export class Physics {
 
         // run the renderer
         Matter.Render.run(this.render);
-        this.render.canvas.style.background = 'rgb(21 21 21 / 20%)';
+        this.render.canvas.style.background = 'rgb(21 21 21 / 10%)';
     }
 
     snapDirToVec(direction: number, magnitude: number) {

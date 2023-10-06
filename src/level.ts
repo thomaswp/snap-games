@@ -56,7 +56,7 @@ export class Levels {
             set: (s, v) => s.setVisibility(v),
         });
         attrs.push({
-            name: 'is clone',
+            name: IS_CLONE,
             get: s => s.isTemporary,
             set: null,
         });
@@ -112,12 +112,17 @@ export class Levels {
                 // this.assertType(row, 'list');
 
                 let name = Levels.getAttribute(NAME, rowList, header);
+                // Backwards compatibility
+                if (name == null) name = Levels.getAttribute("Name", rowList, header);
                 let isTemporary = Levels.getAttribute(IS_CLONE, rowList, header);
 
                 let sprite = stage.children.filter(s =>
                     s instanceof SpriteMorph && s.name === name
                 )[0];
-                if (!sprite) return;
+                if (!sprite) {
+                    console.warn('Sprite not found:', name);
+                    return;
+                }
                 if (isTemporary) {
                     sprite = sprite.newClone(false);
                 }
