@@ -4,6 +4,7 @@ import * as hull from 'hull.js'
 import { Blocks, ExtensionManager, OverrideRegistry, Snap } from 'sef';
 import { Color, Costume, Point, SpriteMorph, StageMorph } from 'sef/src/snap/Snap';
 import { Transform } from './Camera';
+import { extend } from 'sef/src/extend/OverrideRegistry';
 
 const ZERO = new Point(0, 0);
 
@@ -447,21 +448,22 @@ export class Physics {
 
 function addOverrides() {
 
+    let spriteMorph = extend(SpriteMorph.prototype);
+
+    // Cannot use extend because this is a function we created in Camera
     OverrideRegistry.after(SpriteMorph, 'updateStageTransform', function() {
         let physics = Physics.getPhysics();
         if (!physics) return;
         physics.updateSpriteBody(this);
     });
 
-    OverrideRegistry.extend(SpriteMorph, 'destroy', function(base) {
-        base.call(this);
+    spriteMorph.destroy.after(function() {
         let physics = Physics.getPhysics();
         if (!physics) return;
         physics.removeSprite(this);
     });
 
-    OverrideRegistry.extend(SpriteMorph, 'wearCostume', function(base, costume, noShadow) {
-        base.call(this, costume, noShadow);
+    spriteMorph.wearCostume.after(function() {
         if (this.isPhysicsObject) {
             let physics = Physics.getPhysics();
             if (!physics) return;
@@ -469,7 +471,6 @@ function addOverrides() {
             physics.addSprite(this);
         }
     });
-
 }
 
 function addBlocks(blockFactory: Blocks.BlockFactory) {
