@@ -1,4 +1,5 @@
 import { OverrideRegistry, Blocks, Snap } from "sef";
+import { extend } from "sef/src/extend/OverrideRegistry";
 import { HandMorph, Point, Process, SpriteMorph, StageMorph } from "sef/src/snap/Snap";
 
 /**
@@ -356,41 +357,36 @@ SpriteMorph.prototype.updateStageTransform = function() {
 
 function addOverrides() {
 
+    const spriteMorph = extend(SpriteMorph.prototype);
+    const stageMorph = extend(StageMorph.prototype);
+
     SpriteMorph.prototype.initTransform = function() {
         this.transform = new Transform();
         this.updateStageTransform();
     }
 
-    OverrideRegistry.after(SpriteMorph, 'init', function() {
+    spriteMorph.init.after(function() {
         this.initTransform();
     });
 
-    OverrideRegistry.wrap(SpriteMorph, 'setPosition', function() {
-        this.updateGlobalTransform();
-    }, function() {
-        this.updateStageTransform();
+    [spriteMorph.setPosition, spriteMorph.setCenter].forEach(f => {
+        f.wrap(function() {
+            this.updateGlobalTransform();
+        }, function() {
+            this.updateStageTransform();
+        });
     });
 
-    OverrideRegistry.wrap(SpriteMorph, 'setCenter', function() {
-        this.updateGlobalTransform();
-    }, function() {
-        this.updateStageTransform();
+    [spriteMorph.reactToDropOf, spriteMorph.add].forEach(f => {
+        f.after(function() {
+            if (this instanceof SpriteMorph) {
+                this.updateStageTransform();
+            }
+        });
     });
 
-    OverrideRegistry.after(StageMorph, 'reactToDropOf', function(morph) {
-        if (morph instanceof SpriteMorph) {
-            morph.updateStageTransform();
-        }
-    });
-
-    OverrideRegistry.after(StageMorph, 'add', function(morph) {
-        if (morph instanceof SpriteMorph) {
-            morph.updateStageTransform();
-        }
-    });
-
-    OverrideRegistry.extend(SpriteMorph, 'gotoXY', function(base, x, y, justMe, noShadow) {
-        if (!this.transform) return base.call(this, x, y, justMe, noShadow);
+    spriteMorph.gotoXY.override(function(c, x, y, justMe, noShadow) {
+        if (!this.transform) return c.callWithOriginalArgs();
         if (!noShadow) {
             this.shadowAttribute('x position');
             this.shadowAttribute('y position');
@@ -401,23 +397,23 @@ function addOverrides() {
         this.updateGlobalTransform(justMe, true);
     });
 
-    OverrideRegistry.extend(SpriteMorph, 'xPosition', function(base) {
+    spriteMorph.xPosition.override(function() {
         if (this.inheritsAttribute('x position')) {
             return this.exemplar.xPosition();
         }
         return this.transform.position.x;
     });
 
-    OverrideRegistry.extend(SpriteMorph, 'yPosition', function(base) {
+    spriteMorph.yPosition.override(function() {
         if (this.inheritsAttribute('y position')) {
             return this.exemplar.yPosition();
         }
         return this.transform.position.y;
     });
 
-    OverrideRegistry.extend(SpriteMorph, 'forward', function(base, steps) {
-        if (steps === 0 && this.isDown) {
-            return base.call(this, steps);
+    spriteMorph.forward.override(function(c, steps) {
+        if (this.isDown) {
+            return c.callWithOriginalArgs();
         }
         let dest = this.transform.forwardPosition(steps);
         this.gotoXY(dest.x, dest.y);
@@ -467,9 +463,9 @@ function addOverrides() {
         return this.transform.scale * 100;
     };
 
-    OverrideRegistry.after(SpriteMorph, 'clonify', function() {
+    spriteMorph.clonify.after(function() {
         this.transform = this.transform.copy();
-    });
+    })
 
     StageMorph.prototype.updateSpriteForCamera = function(force: boolean) {
         let camera = Camera.getCamera();
@@ -483,18 +479,21 @@ function addOverrides() {
         });
     }
 
-    OverrideRegistry.after(StageMorph, 'mouseScroll', function(y) {
+    stageMorph.mouseScroll.after(function(c, y) {
         let camera = Camera.getCamera();
         if (camera) camera.handleMouseScroll(y);
     });
 
-    OverrideRegistry.extend(StageMorph, 'mouseDownLeft', function(base, pos) {
+    // Can't check params because the StageMorph masks its parent's args. I think I can
+    // fix this in the DefGenerator, but for now this is an easy fix
+    OverrideRegistry.extend(StageMorph, StageMorph.prototype.mouseDownLeft, function(base, pos) {
         let camera = Camera.getCamera();
         if (camera && camera.handleMouseDown(pos)) return;
         base.call(this, pos);
     }, false);
 
-    OverrideRegistry.after(StageMorph, 'stepFrame', function() {
+
+    stageMorph.stepFrame.after(function() {
         this.updateSpriteForCamera();
     });
 
@@ -507,19 +506,21 @@ function addOverrides() {
 
     const baseStageMouseX = StageMorph.prototype.reportMouseX;
     const baseStageMouseY = StageMorph.prototype.reportMouseY;
-    OverrideRegistry.extend(StageMorph, 'reportMouseX', function(base) {
+    stageMorph.reportMouseX.override(function() {
         return getTransformedPoint(baseStageMouseX.call(this), baseStageMouseY.call(this)).x;
     });
-    OverrideRegistry.extend(StageMorph, 'reportMouseY', function(base) {
+    stageMorph.reportMouseY.override(function() {
         return getTransformedPoint(baseStageMouseX.call(this), baseStageMouseY.call(this)).y;
     });
 
+    const process = extend(Process.prototype);
+
     const baseProcessMouseX = Process.prototype.reportMouseX;
     const baseProcessMouseY = Process.prototype.reportMouseY;
-    OverrideRegistry.extend(Process, 'reportMouseX', function(base) {
+    process.reportMouseX.override(function() {
         return getTransformedPoint(baseProcessMouseX.call(this), baseProcessMouseY.call(this)).x;
     });
-    OverrideRegistry.extend(Process, 'reportMouseY', function(base) {
+    process.reportMouseY.override(function() {
         return getTransformedPoint(baseProcessMouseX.call(this), baseProcessMouseY.call(this)).y;
     });
 }
