@@ -28,12 +28,12 @@ export class Levels {
         attrs.push({
             name: 'x',
             get: s => s.xPosition(),
-            set: (s, v) => s.setXPosition(v),
+            set: (s, v) => s.setXPosition(v as number),
         });
         attrs.push({
             name: 'y',
             get: s => s.yPosition(),
-            set: (s, v) => s.setYPosition(v),
+            set: (s, v) => s.setYPosition(v as number),
         });
         attrs.push({
             name: 'direction',
@@ -53,7 +53,7 @@ export class Levels {
         attrs.push({
             name: 'showing',
             get: s => s.reportShown(),
-            set: (s, v) => s.setVisibility(v),
+            set: (s, v) => s.setVisibility(v as boolean),
         });
         attrs.push({
             name: IS_CLONE,
